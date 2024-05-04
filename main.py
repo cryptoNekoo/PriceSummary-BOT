@@ -1,10 +1,9 @@
 import logging
+import time
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InputFile
 from collections import Counter
 import requests
-import json
-import time
 from config import BOT_TOKEN, TOKEN
 
 bot = Bot(token=BOT_TOKEN)
@@ -52,6 +51,8 @@ async def process_ids(item_ids):
                 if item_state == "paid":
                     sold_accounts.append((link, price))
                     total_sold += price
+                elif item_state == "deleted":
+                    errors.append(link)
                 else:
                     unsold_accounts.append((link, price))
                     total_unsold += price
@@ -77,7 +78,7 @@ async def process_ids(item_ids):
         if errors:
             file.write("\n🗑️ *Удаленные/нет доступа:*\n")
             for error in errors:
-                file.write(f"- https://lzt.market/{error}/\n")
+                file.write(f"- {error}\n")
 
     return "result.txt"
 
@@ -104,9 +105,13 @@ async def handle_docs(message: types.Message):
 
 @dp.message_handler()
 async def handle_text(message: types.Message):
+    await message.reply("Обработка данных начата. Пожалуйста, подождите...")
+    chat_id = message.chat.id
+    message_id = message.message_id
     ids = [int(line.strip().split('/')[-2]) for line in message.text.splitlines()]
     result_file = await process_ids(ids)
-    await message.reply_document(InputFile(result_file))
+    await bot.send_document(chat_id, document=InputFile(result_file))
+    await bot.delete_message(chat_id, message_id)
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
